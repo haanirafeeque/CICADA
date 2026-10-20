@@ -2,6 +2,8 @@
 
 A dark, mobile-first puzzle hunt built with Next.js App Router, TypeScript, plain CSS, and Upstash Redis. Stage answers, the riddle answer, flag, session key, and referral key are read only on the server from environment variables.
 
+**Live demo:** [cicada-roan.vercel.app](https://cicada-roan.vercel.app)
+
 ## Local setup
 
 1. Install Node.js LTS 20 or newer and npm.
