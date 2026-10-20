@@ -23,11 +23,17 @@ export const hintThree =
   "Fans gather in one place. Write that place's name in capitals, with no spaces.";
 
 export const publicNotes: Record<string, string> = {
-  "1": "The first note is a fragment from the edge of the network. Observe what is present, and what is missing.",
-  "2": "The second note is incomplete by design. Not every note is listed here.",
+  "01": "The first note is a fragment from the edge of the network. Observe what is present, and what is missing.",
+  "02": "The second note is incomplete by design. Not every note is listed here.",
 };
 
-export const noteSevenPlaceholder = "A restricted note. Its contents are available through the challenge.";
+export const noteThreePlaceholder = "A restricted note. Its contents are available through the challenge.";
+
+export const notesBeginnerHint =
+  "Open your browser's Developer Tools and select Network. Find the /api/notes/... request made when a listed note loads. Can you request a note number that is not listed?";
+
+export const notesStoryHint =
+  "Still stuck? Watch the CICADA Instagram page for an extra hint in its Story.";
 
 export const workshopPlaceholders = {
   name: "Workshop details to be announced",
@@ -35,7 +41,7 @@ export const workshopPlaceholders = {
   venue: "Venue to be announced",
 };
 
-export const eventReveal = "This was a pre-event of FANDOM ZONE, conducted by the Cybersecurity IG.";
+export const eventReveal = "This was a pre-event of FANDOM ZONE.";
 
 export const closedCopy = "THE DOOR IS CLOSED. All 15 codes have been claimed. Thank you for playing.";
 

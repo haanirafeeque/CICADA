@@ -2,20 +2,21 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { notesBeginnerHint, notesStoryHint } from "@/lib/content";
 
-type NoteResult = { id: number; note: string; flag?: string };
+type NoteResult = { id: string; note: string; flag?: string };
 
 export function NotesPanel({ selectedId }: { selectedId: string | null }) {
   const [notes, setNotes] = useState<Record<number, NoteResult | string>>({});
 
   useEffect(() => {
-    const ids = new Set(["1", "2"]);
+    const ids = new Set(["01", "02"]);
     if (selectedId) ids.add(selectedId);
 
     let active = true;
     void Promise.all([...ids].map(async (id) => {
       try {
-        const response = await fetch(`/api/ctf/notes?id=${encodeURIComponent(id)}`, { cache: "no-store" });
+        const response = await fetch(`/api/notes/${encodeURIComponent(id)}`, { cache: "no-store" });
         if (!response.ok) return [Number(id), "No note found."] as const;
         return [Number(id), await response.json() as NoteResult] as const;
       } catch {
@@ -37,8 +38,8 @@ export function NotesPanel({ selectedId }: { selectedId: string | null }) {
         <h2 id="notes-heading">Notes</h2>
       </div>
       <nav className="note-index" aria-label="Available notes">
-        <Link href="/ctf?id=1#notes">NOTE 01</Link>
-        <Link href="/ctf?id=2#notes">NOTE 02</Link>
+        <Link href="/ctf?id=01#notes">NOTE 01</Link>
+        <Link href="/ctf?id=02#notes">NOTE 02</Link>
       </nav>
       <div className="note-list">
         {[1, 2].map((id) => {
@@ -52,7 +53,12 @@ export function NotesPanel({ selectedId }: { selectedId: string | null }) {
           );
         })}
       </div>
-      {selectedId && selectedId !== "1" && selectedId !== "2" && (
+      <details className="notes-hint">
+        <summary>Need a beginner hint?</summary>
+        <p>{notesBeginnerHint}</p>
+        <p>{notesStoryHint}</p>
+      </details>
+      {selectedId && selectedId !== "01" && selectedId !== "02" && (
         <article className="note-card note-card--selected" aria-live="polite">
           <span className="micro-label">REQUESTED NOTE</span>
           {selected ? (

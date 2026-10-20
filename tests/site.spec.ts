@@ -8,17 +8,20 @@ const redisStubUrl = "http://127.0.0.1:8787";
 const stageAnswers = [process.env.STAGE1_ANSWER!, process.env.STAGE2_ANSWER!, process.env.STAGE3_ANSWER!];
 const riddleAnswer = process.env.CTF_RIDDLE_ANSWER!;
 const flagValue = process.env.CTF_FLAG!;
+type PlayerIdentity = { name: string; email: string };
+const defaultPlayer: PlayerIdentity = { name: "Test Player", email: "player@example.invalid" };
 
 async function resetRedis(): Promise<void> {
   await fetch(`${redisStubUrl}/__reset`, { method: "POST" });
 }
 
-async function submitStages(page: Page): Promise<void> {
+async function submitStages(page: Page, player: PlayerIdentity = defaultPlayer): Promise<void> {
   await page.goto("/enter");
   await page.getByLabel("Stage 1").fill(stageAnswers[0]);
   await page.getByLabel("Stage 2").fill(stageAnswers[1]);
   await page.getByLabel("Stage 3").fill(stageAnswers[2]);
-  await page.getByLabel("Phone or email").fill("player@example.invalid");
+  await page.getByLabel("Your name").fill(player.name);
+  await page.getByLabel("Email address").fill(player.email);
   await page.getByRole("button", { name: /verify/i }).click();
   await page.waitForURL("**/ctf");
 }
@@ -33,8 +36,8 @@ async function submitRiddle(page: Page, answer = riddleAnswer): Promise<void> {
   await page.getByRole("button", { name: /unlock notes/i }).click();
 }
 
-async function solveThroughRiddle(page: Page, answer = riddleAnswer): Promise<void> {
-  await submitStages(page);
+async function solveThroughRiddle(page: Page, answer = riddleAnswer, player: PlayerIdentity = defaultPlayer): Promise<void> {
+  await submitStages(page, player);
   await submitRiddle(page, answer);
   await expect(page.getByRole("heading", { name: "One record is missing." })).toBeVisible();
 }
@@ -101,7 +104,8 @@ test("wrong stage values are rejected and kept in the form", async ({ page }) =>
   await page.getByLabel("Stage 1").fill(wrong);
   await page.getByLabel("Stage 2").fill(stageAnswers[1]);
   await page.getByLabel("Stage 3").fill(stageAnswers[2]);
-  await page.getByLabel("Phone or email").fill("player@example.invalid");
+  await page.getByLabel("Your name").fill(defaultPlayer.name);
+  await page.getByLabel("Email address").fill(defaultPlayer.email);
   await page.getByRole("button", { name: /verify/i }).click();
   await expect(page).toHaveURL(/status=wrong/u);
   await expect(page.getByText("One or more answers are not correct.")).toBeVisible();
@@ -175,19 +179,27 @@ test("hint one is visible and hint three unlocks after three hours", async ({ pa
   await expect(page.getByText(unlocked.hint!)).toBeVisible();
 });
 
-test("note 7 is unavailable before riddle verification and returns only the flag note after", async ({ page }) => {
+test("note 03 is unavailable before riddle verification and returns only the flag note after", async ({ page }) => {
   await submitStages(page);
-  const blocked = await page.request.get("/api/ctf/notes?id=7");
+  const publicNote = await page.request.get("/api/notes/01");
+  expect(publicNote.status()).toBe(200);
+  expect((await publicNote.json() as { id: string }).id).toBe("01");
+  const blocked = await page.request.get("/api/notes/03");
   expect(blocked.status()).toBe(404);
+  expect((await page.request.get("/api/notes/7")).status()).toBe(404);
+  expect((await page.request.get("/api/ctf/notes?id=7")).status()).toBe(404);
   await submitRiddle(page);
-  const opened = await page.request.get("/api/ctf/notes?id=7");
+  const opened = await page.request.get("/api/notes/03");
   expect(opened.status()).toBe(200);
-  const payload = await opened.json() as { id: number; note: string; flag: string };
-  expect(payload.id).toBe(7);
+  const payload = await opened.json() as { id: string; note: string; flag: string };
+  expect(payload.id).toBe("03");
   expect(payload.flag).toBe(flagValue);
   expect(Object.keys(payload).sort()).toEqual(["flag", "id", "note"]);
-  await page.goto("/ctf?id=7");
+  await page.goto("/ctf?id=03");
   await expect(page.locator(".flag-value")).toHaveText(flagValue);
+  await page.getByText("Need a beginner hint?").click();
+  await expect(page.getByText("Open your browser's Developer Tools and select Network. Find the /api/notes/... request made when a listed note loads. Can you request a note number that is not listed?")).toBeVisible();
+  await expect(page.getByText("Still stuck? Watch the CICADA Instagram page for an extra hint in its Story.")).toBeVisible();
 });
 
 test("flag rejects a wrong value and a correct flag reveals the winner page", async ({ page }) => {
@@ -197,12 +209,10 @@ test("flag rejects a wrong value and a correct flag reveals the winner page", as
   await submitFlag(page);
   await expect(page).toHaveURL(/\/reward$/u);
   await expect(page.getByRole("heading", { name: "CONGRATULATIONS." })).toBeVisible();
-  const expectedCode = createHmac("sha256", process.env.REFERRAL_SECRET!)
-    .update("winner:1")
-    .digest("hex")
-    .slice(0, 8)
-    .toUpperCase();
-  await expect(page.getByText(`CICADA-${expectedCode}`)).toBeVisible();
+  const code = await page.locator(".winner-code").innerText();
+  expect(code).toMatch(/^CICADA-(?:[0-9A-F]{4}-){5}[0-9A-F]{4}$/u);
+  const storedWinner = await (await fetch(`${redisStubUrl}/__inspect?key=winner%3A01`)).json() as { result: { name: string; email: string; couponCode: string; winnerIndex: string } };
+  expect(storedWinner.result).toEqual({ name: defaultPlayer.name, email: defaultPlayer.email, couponCode: code, winnerIndex: "01" });
 });
 
 test("wrong stage submissions lock the session after five attempts", async ({ page }) => {
@@ -211,7 +221,8 @@ test("wrong stage submissions lock the session after five attempts", async ({ pa
     await page.getByLabel("Stage 1").fill(`wrong-${randomBytes(6).toString("hex")}`);
     await page.getByLabel("Stage 2").fill(stageAnswers[1]);
     await page.getByLabel("Stage 3").fill(stageAnswers[2]);
-    await page.getByLabel("Phone or email").fill("player@example.invalid");
+    await page.getByLabel("Your name").fill(defaultPlayer.name);
+    await page.getByLabel("Email address").fill(defaultPlayer.email);
     await page.getByRole("button", { name: /verify/i }).click();
     if (attempt < 4) await expect(page).toHaveURL(/status=wrong/u);
   }
@@ -232,13 +243,18 @@ test("flag attempts are limited to ten per session in ten minutes", async ({ pag
 
 test("the 16th successful CTF completion is closed and cannot receive a code", async ({ browser }) => {
   test.setTimeout(180_000);
+  const winnerCodes = new Set<string>();
   for (let index = 1; index <= 16; index += 1) {
     const page = await browser.newPage({ extraHTTPHeaders: { "x-forwarded-for": `192.0.2.${index}` } });
-    await solveThroughRiddle(page);
+    await solveThroughRiddle(page, riddleAnswer, { name: `Test Player ${index}`, email: `player-${index}@example.invalid` });
     await submitFlag(page);
     if (index <= 15) {
       await expect(page).toHaveURL(/\/reward$/u);
       await expect(page.locator(".winner-code")).toBeVisible();
+      const code = await page.locator(".winner-code").innerText();
+      expect(code).toMatch(/^CICADA-(?:[0-9A-F]{4}-){5}[0-9A-F]{4}$/u);
+      expect(winnerCodes.has(code)).toBe(false);
+      winnerCodes.add(code);
     } else {
       await expect(page).toHaveURL(/\/closed$/u);
       await expect(page.getByText(/All 15 codes have been claimed/u)).toBeVisible();
@@ -246,6 +262,7 @@ test("the 16th successful CTF completion is closed and cannot receive a code", a
     }
     await page.context().close();
   }
+  expect(winnerCodes.size).toBe(15);
 });
 
 test("reward is blocked for non-winners and repeated claims do not increment the counter", async ({ page }) => {
@@ -285,7 +302,7 @@ test("server-rendered pages and generated client assets contain no configured an
   await page.goto("/ctf");
   const riddleMarkup = await page.content();
   for (const value of [...stageAnswers, riddleAnswer, flagValue]) expect(riddleMarkup).not.toContain(value);
-  await seedSession(page.context(), { ctfCompleted: true, winnerIndex: 1, riddleSolved: true });
+  await seedSession(page.context(), { ctfCompleted: true, winnerIndex: 1, winnerCode: "CICADA-ABCD-ABCD-ABCD-ABCD-ABCD", riddleSolved: true });
   await page.goto("/reward");
   const rewardMarkup = await page.content();
   for (const value of [...stageAnswers, riddleAnswer, flagValue]) expect(rewardMarkup).not.toContain(value);
@@ -302,7 +319,7 @@ test("mobile layout has no horizontal overflow on all pages at 360px", async ({ 
   await page.goto("/ctf");
   await verifyNoHorizontalOverflow(page);
 
-  await seedSession(page.context(), { ctfCompleted: true, winnerIndex: 1, riddleSolved: true });
+  await seedSession(page.context(), { ctfCompleted: true, winnerIndex: 1, winnerCode: "CICADA-ABCD-ABCD-ABCD-ABCD-ABCD", riddleSolved: true });
   await page.goto("/reward");
   await verifyNoHorizontalOverflow(page);
   await page.close();
@@ -319,7 +336,7 @@ test("responsive layout has no horizontal overflow at 390, 768, 1024, and 1440px
     await seedSession(page.context(), { riddleSolved: false });
     await page.goto("/ctf");
     await verifyNoHorizontalOverflow(page);
-    await seedSession(page.context(), { ctfCompleted: true, winnerIndex: 1, riddleSolved: true });
+    await seedSession(page.context(), { ctfCompleted: true, winnerIndex: 1, winnerCode: "CICADA-ABCD-ABCD-ABCD-ABCD-ABCD", riddleSolved: true });
     await page.goto("/reward");
     await verifyNoHorizontalOverflow(page);
   }

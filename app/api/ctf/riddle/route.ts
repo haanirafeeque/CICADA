@@ -17,7 +17,12 @@ export async function POST(request: NextRequest) {
   try {
     const session = await readSession(redis, environment.SESSION_SECRET, request);
     if (!session?.data.stagesVerified) return redirectTo(request, "/enter");
-    if (session.data.ctfCompleted) return redirectTo(request, session.data.winnerIndex ? "/reward" : "/closed");
+    if (session.data.ctfCompleted) {
+      const destination = session.data.winnerIndex
+        ? "/reward"
+        : session.data.winnerClaimRejected ? "/closed?status=duplicate" : "/closed";
+      return redirectTo(request, destination);
+    }
 
     const rate = await enforceRateLimit(redis, request, "riddle", session.id, 15, 10 * 60);
     if (!rate.allowed) return redirectTo(request, "/ctf?status=locked");

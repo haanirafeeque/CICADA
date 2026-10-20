@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  allowedDevOrigins: ["192.168.29.10"],
   productionBrowserSourceMaps: false,
   async headers() {
     const developmentScript = process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : "";

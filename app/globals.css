@@ -179,6 +179,11 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 .note-card { padding: 18px; border: 1px solid var(--line); }
 .note-card p { margin: 10px 0 0; color: #c9c9c9; font-size: 0.9rem; }
 .note-card--selected { margin-top: 14px; border-color: var(--line-strong); }
+.notes-hint { margin-top: 22px; padding-top: 10px; border-top: 1px solid var(--line); }
+.notes-hint summary { min-height: 44px; display: flex; align-items: center; color: #c9c9c9; font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; }
+.notes-hint summary:hover, .notes-hint summary:focus-visible { color: #fff; }
+.notes-hint summary:focus-visible { outline: 2px solid #fff; outline-offset: 4px; }
+.notes-hint p { max-width: 62ch; margin: 8px 0; color: #a5a5a5; font-size: 0.86rem; line-height: 1.7; }
 .flag-value { display: block; overflow-wrap: anywhere; margin-top: 18px; padding: 13px; border: 1px dashed var(--line-strong); color: #fff; font-family: var(--font-mono); font-size: 0.92rem; }
 
 .reward-card { margin-top: 32px; }
@@ -190,6 +195,7 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 .workshop-details { display: grid; gap: 13px; padding-top: 23px; border-top: 1px solid var(--line); }
 .workshop-details p { margin: 0; color: #c6c6c6; }
 .workshop-details .micro-label { display: block; margin-bottom: 4px; }
+.workshop-register a { color: #ededed; text-decoration: underline; text-underline-offset: 3px; }
 .refund-note { margin: 26px 0 0; padding-top: 20px; border-top: 1px solid var(--line); color: #d0d0d0; }
 .refund-note a { text-decoration: underline; text-underline-offset: 3px; }
 .logo-row { display: flex; flex-wrap: wrap; gap: 24px; align-items: center; margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--line); }

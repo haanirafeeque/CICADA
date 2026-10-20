@@ -45,7 +45,7 @@ export default async function EnterPage({ searchParams }: EntryPageProps) {
     <Frame label="ANSWER ENTRY">
       <span className="micro-label">THE FINAL CHECKPOINT</span>
       <h1 className="page-title">Keep what you found.</h1>
-      <p className="page-lede">Enter the three answers you kept. Use the contact where you can be reached.</p>
+      <p className="page-lede">Enter the three answers you kept, along with your name and email address. Each name and email can claim at most one coupon code.</p>
       {message && <Notice>{message}</Notice>}
 
       {environment && redis && (
@@ -62,13 +62,13 @@ export default async function EnterPage({ searchParams }: EntryPageProps) {
             <label htmlFor="stage3">Stage 3</label>
             <input id="stage3" name="stage3" type="text" required maxLength={64} autoComplete="off" autoCapitalize="characters" inputMode="text" defaultValue={draft.stage3} />
           </div>
-          <div className="field field--optional">
-            <label htmlFor="name">Your name <span>OPTIONAL · 40 CHARACTERS MAX</span></label>
-            <input id="name" name="name" type="text" maxLength={40} autoComplete="name" defaultValue={draft.name} />
+          <div className="field">
+            <label htmlFor="name">Your name</label>
+            <input id="name" name="name" type="text" required maxLength={40} autoComplete="name" defaultValue={draft.name} />
           </div>
           <div className="field">
-            <label htmlFor="contact">Phone or email</label>
-            <input id="contact" name="contact" type="text" required maxLength={120} autoComplete="email" inputMode="text" defaultValue={draft.contact} />
+            <label htmlFor="email">Email address</label>
+            <input id="email" name="email" type="email" required maxLength={120} autoComplete="email" defaultValue={draft.email} />
           </div>
           <label className="honeypot" aria-hidden="true" tabIndex={-1}>
             Leave this field empty

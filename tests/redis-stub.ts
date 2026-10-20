@@ -89,6 +89,7 @@ const server = createServer(async (request, response) => {
     const command = commandName.toLowerCase();
 
     if (command === "get") return liveEntry(String(args[0]))?.value ?? null;
+    if (command === "exists") return liveEntry(String(args[0])) ? 1 : 0;
     if (command === "set") {
       const key = String(args[0]);
       const current = liveEntry(key);
@@ -121,19 +122,38 @@ const server = createServer(async (request, response) => {
       const keyCount = Number(args[1]);
       const keys = args.slice(2, 2 + keyCount).map(String);
       const evalArgs = args.slice(2 + keyCount).map(String);
-      const [completedKey, counterKey, sessionKey] = keys;
-      if (!completedKey || !counterKey || !sessionKey) throw new Error("invalid script keys");
+      const [completedKey, counterKey, sessionKey, nameKey, emailKey, codeKey] = keys;
+      if (!completedKey || !counterKey || !sessionKey || !nameKey || !emailKey || !codeKey) throw new Error("invalid script keys");
       if (liveEntry(completedKey)) return 0;
 
       const ttl = Number(evalArgs[0]);
       const limit = Number(evalArgs[1]);
+      const [name, email, couponCode] = evalArgs.slice(2);
+      const current = liveEntry(sessionKey);
+      const session = current ? JSON.parse(current.value) as Record<string, unknown> : {};
+
+      if (liveEntry(nameKey) || liveEntry(emailKey)) {
+        session.ctfCompleted = true;
+        session.winnerClaimRejected = true;
+        setEntry(completedKey, "1", ttl);
+        setEntry(sessionKey, JSON.stringify(session), ttl);
+        return -1;
+      }
+      if (liveEntry(codeKey)) return -2;
+
       setEntry(completedKey, "1", ttl);
       const index = Number.parseInt(liveEntry(counterKey)?.value || "0", 10) + 1;
       setEntry(counterKey, String(index));
-      const current = liveEntry(sessionKey);
-      const session = current ? JSON.parse(current.value) as Record<string, unknown> : {};
       session.ctfCompleted = true;
-      if (index <= limit) session.winnerIndex = index;
+      if (index <= limit) {
+        const indexText = String(index).padStart(2, "0");
+        setEntry(nameKey, indexText);
+        setEntry(emailKey, indexText);
+        setEntry(codeKey, indexText);
+        setEntry(`winner:${indexText}`, JSON.stringify({ name, email, couponCode, winnerIndex: indexText }));
+        session.winnerIndex = index;
+        session.winnerCode = couponCode;
+      }
       setEntry(sessionKey, JSON.stringify(session), ttl);
       return index;
     }

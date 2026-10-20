@@ -18,7 +18,7 @@ Target Windows, macOS, or Linux with its native package manager. Required checks
 4. Use generic errors: never identify a wrong field, proximity, or remaining attempts beyond a neutral lockout notice.
 5. Rate-limit every submission per IP and per session using Redis `INCR` and `EXPIRE`. Lock a session for ten minutes after five wrong stage submissions. Limit flag attempts to ten per ten minutes.
 6. Store session state server-side in Redis under a cryptographically random ID. The cookie contains only that ID and an HMAC-SHA256 signature using `SESSION_SECRET`; set HttpOnly, Secure in production, SameSite=Lax, path `/`, and max-age two hours.
-7. Winner code for winner index `i` is `CICADA-` plus the first eight uppercase hex characters of HMAC-SHA256 with `REFERRAL_SECRET` over `winner:` concatenated with `i`. Add `scripts/print-codes.ts` to print indices 1 through 15 for staff verification.
+7. Generate each winner coupon using cryptographically secure random bytes. Store the generated code together with the winner name and normalized email in a Redis hash named `winner:01`, `winner:02`, and so on. Keep HMAC fingerprints of normalized name and email in Redis and atomically reject a claim if either belongs to an existing winner. `REFERRAL_SECRET` must remain stable throughout the event.
 8. Set CSP (`default-src 'self'` with only Next-required script allowances), `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `X-Content-Type-Options: nosniff`, and `Permissions-Policy` disabling camera, microphone, and geolocation in `next.config.js`.
 9. Disable production browser source maps.
 10. Add a hidden honeypot to the answer form; silently reject if populated.
@@ -32,7 +32,7 @@ Document these names in an empty-valued `.env.example` and README environment ta
 - `STAGE1_ANSWER`, `STAGE2_ANSWER`, `STAGE3_ANSWER`: stage answers. The team sets all values; do not hardcode any answer.
 - `CTF_RIDDLE_ANSWER`: final riddle answer, supplied through the environment.
 - `CTF_FLAG`: team-supplied flag in the required flag format.
-- `SESSION_SECRET`, `REFERRAL_SECRET`: random secrets at least 32 characters. Generate for the team and give them to the user to configure in Vercel, never save them in the repository.
+- `SESSION_SECRET`, `REFERRAL_SECRET`: random secrets at least 32 characters. `REFERRAL_SECRET` must remain stable throughout the event. Never save secrets in the repository.
 - `WINNER_LIMIT`: default 15.
 - `CONTACT_NUMBER`: contact number for the 50% refund process.
 - `EVENT_NAME`: default FANDOM ZONE.
@@ -57,11 +57,11 @@ Document these names in an empty-valued `.env.example` and README environment ta
 
 ### `/enter`
 
-- Three stage inputs, optional name (max 40 chars), required phone or email, and hidden honeypot.
+- Three stage inputs, required name (max 40 chars), required email address, and hidden honeypot.
 - Submit label “VERIFY”. Use a progressive-enhancement server form so core flow works with JavaScript disabled.
 - Submit to `/api/enter`. Apply rate/lockout logic and verify all stages only on the server.
 - On wrong values, show “One or more answers are not correct.” and keep form values without identifying the failing field or adding hints.
-- On success, save `stagesVerified` and contact details in the server session and redirect to `/ctf`.
+- On success, save `stagesVerified`, name, and normalized email in the server session and redirect to `/ctf`.
 - Never disclose answer lengths or field-specific clues.
 
 ### `/ctf`
@@ -73,13 +73,14 @@ Document these names in an empty-valued `.env.example` and README environment ta
 - Hint 1, always visible: “This hunt is a pre-event. The main event is the next big gathering on campus, and it has a name that every fan knows.”
 - Hint 3, locked until three hours after the first verified `/ctf` visit: “Fans gather in one place. Write that place's name in capitals, with no spaces.”
 - Put both hints in `lib/content.ts`. `GET /api/ctf/hint?n=3` must return only remaining-time text until unlock; after unlock return hint 3. Do not create a hint 2.
-- After the riddle is solved show a Notes panel with public notes 1 and 2. Note 2 includes “Not every note is listed here.” Fetch via `GET /api/ctf/notes?id=N`.
-- IDs 1 and 2 return public text. ID 7 is the intentional IDOR challenge: return only the flag note if `riddleSolved`; otherwise 404. Every other ID returns 404. Isolate the vulnerability so it reveals no other data, environment values, or sessions.
+- After the riddle is solved show a Notes panel with public notes 01 and 02. Note 02 includes “Not every note is listed here.” Fetch notes via `GET /api/notes/{id}`.
+- Paths `/api/notes/01` and `/api/notes/02` return public text. `/api/notes/03` is the intentional IDOR challenge: return only the flag note if `riddleSolved`; otherwise 404. Every other path ID returns 404. Isolate the vulnerability so it reveals no other data, environment values, or sessions.
+- Give CTF beginners an optional progressive hint near the Notes panel. Tell players to watch the CICADA Instagram Story for an additional hint when posted.
 - Flag form posts to `/api/ctf/flag`; check `CTF_FLAG` server-side with normalization and timing-safe compare; rate-limit it.
 
 ### Winner handling
 
-- On flag success, use atomic Redis `INCR winners:count` as the winner index.
+- On flag success, atomically reject names or emails already used by a winner; otherwise use Redis `INCR winners:count` as the winner index and store the winner hash.
 - If index <= configured limit: save winner index and `ctfCompleted=true`, redirect `/reward`.
 - If index exceeds limit: do not decrement; set `ctfCompleted=true` without winner index, redirect `/closed`.
 - Use `SET session:{id}:completed 1 NX` to prevent a second claim. A repeated flag submission must not mint another index or code.
@@ -124,14 +125,13 @@ Document these names in an empty-valued `.env.example` and README environment ta
 
 Add Playwright tests for landing render; wrong/correct stage submissions (read values from environment); `/ctf` verification gate; wrong/right riddle including normalized variants; hint visibility, locked/unlocked using mocked time; notes IDOR 404 before riddle success and note after; wrong/right flag; rate limits; first 15 winners; 16th redirect; reward guard; repeated flag submission; mobile layouts at 360px for every page.
 
-Before finishing, run lint, typecheck, build, and browser/security checks. Search `.next/static` for answer values and the flag with zero matches; ensure page source has no answers; ensure no secret uses a `NEXT_PUBLIC_` prefix; ensure ID 7 returns 404 before riddle verification. Verify generated winner codes against `scripts/print-codes.ts`. Check missing-env fail-closed behavior. Test responsive widths 360, 390, 768, 1024, 1440. Lighthouse mobile performance, accessibility, and best practices target 90+. Report checks in a concise checklist, calling out anything not verified.
+Before finishing, run lint, typecheck, build, and browser/security checks. Search `.next/static` for answer values and the flag with zero matches; ensure page source has no answers; ensure no secret uses a `NEXT_PUBLIC_` prefix; ensure ID 7 returns 404 before riddle verification. Check missing-env fail-closed behavior. Test responsive widths 360, 390, 768, 1024, 1440. Lighthouse mobile performance, accessibility, and best practices target 90+. Report checks in a concise checklist, calling out anything not verified.
 
 ## Deliverables
 
 - Complete project tree.
 - `README.md` with local setup, Vercel deployment, environment variable table, setting answers, printing winner codes, and closing after the winner limit.
 - Empty-valued `.env.example`.
-- `scripts/print-codes.ts`.
 - A note explaining the intentional IDOR challenge only exposes the flag.
 - `MEMORY.md` updated after scaffold, pages, APIs, tests, and deployment milestones. It must track status, decisions, variable names (never values), file structure, run/test steps, known issues, and exact next step.
 

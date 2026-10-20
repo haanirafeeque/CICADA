@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
       stage2: readTextField(form, "stage2"),
       stage3: readTextField(form, "stage3"),
       name: readTextField(form, "name"),
-      contact: readTextField(form, "contact"),
+      email: readTextField(form, "email"),
       website: readTextField(form, "website"),
     };
 
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
       const lockout = await recordWrongStage(redis, session.id);
       await redis.set(
         `session:${session.id}:entryDraft`,
-        { stage1: parsed.data.stage1, stage2: parsed.data.stage2, stage3: parsed.data.stage3, name: parsed.data.name, contact: parsed.data.contact },
+        { stage1: parsed.data.stage1, stage2: parsed.data.stage2, stage3: parsed.data.stage3, name: parsed.data.name, email: parsed.data.email },
         { ex: 10 * 60 },
       );
       const response = redirectTo(request, lockout ? "/enter?status=locked" : "/enter?status=wrong");
@@ -75,7 +75,11 @@ export async function POST(request: NextRequest) {
     await redis.del(`session:${session.id}:entryDraft`, `wrong:stage:${session.id}`, `lock:stage:${session.id}`);
     session.data.stagesVerified = true;
     session.data.contactName = parsed.data.name;
-    session.data.contact = parsed.data.contact;
+    session.data.contactEmail = parsed.data.email;
+    session.data.riddleSolved = false;
+    delete session.data.riddleOpenedAt;
+    delete session.data.ctfCompleted;
+    delete session.data.winnerClaimRejected;
     await saveSession(redis, session);
     const response = redirectTo(request, "/ctf");
     return cookieValue ? setSessionCookie(response, cookieValue) : response;

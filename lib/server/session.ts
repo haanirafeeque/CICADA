@@ -11,11 +11,13 @@ export const SESSION_COOKIE_TTL = 2 * 60 * 60;
 export type SessionData = {
   stagesVerified?: boolean;
   contactName?: string;
-  contact?: string;
+  contactEmail?: string;
   riddleSolved?: boolean;
   riddleOpenedAt?: number;
   ctfCompleted?: boolean;
   winnerIndex?: number;
+  winnerCode?: string;
+  winnerClaimRejected?: boolean;
 };
 
 export type SessionContext = { id: string; data: SessionData };

@@ -7,8 +7,8 @@ export const entrySchema = z.object({
   stage1: answerField,
   stage2: answerField,
   stage3: answerField,
-  name: z.string().trim().max(40).optional().default(""),
-  contact: z.string().trim().min(1).max(120),
+  name: z.string().trim().min(1).max(40).transform((value) => value.replace(/\s+/gu, " ")),
+  email: z.string().trim().email().max(120).transform((value) => value.toLowerCase()),
   website: z.string().max(200).optional().default(""),
 });
 

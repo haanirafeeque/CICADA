@@ -36,7 +36,12 @@ export default async function CtfPage({ searchParams }: CtfPageProps) {
   try {
     session = await readSession(redis, environment.SESSION_SECRET);
     if (!session?.data.stagesVerified) redirect("/enter");
-    if (session.data.ctfCompleted) redirect(session.data.winnerIndex ? "/reward" : "/closed");
+    if (session.data.ctfCompleted) {
+      const destination = session.data.winnerIndex
+        ? "/reward"
+        : session.data.winnerClaimRejected ? "/closed?status=duplicate" : "/closed";
+      redirect(destination);
+    }
     await openRiddleWindow(redis, session);
   } catch (error) {
     if (error && typeof error === "object" && "digest" in error) throw error;

@@ -5,11 +5,12 @@ import { join } from "node:path";
 import { redirect } from "next/navigation";
 import { CopyCodeButton } from "@/components/CopyCodeButton";
 import { Frame } from "@/components/Frame";
+import { WorkshopRegistrationLink } from "@/components/WorkshopRegistrationLink";
 import { eventReveal, workshopCredit, workshopPlaceholders } from "@/lib/content";
 import { requireEnv, requiredChallengeEnv } from "@/lib/server/env";
 import { getRedis } from "@/lib/server/redis";
 import { readSession } from "@/lib/server/session";
-import { getWinnerLimit, makeWinnerCode } from "@/lib/server/winner";
+import { getWinnerLimit } from "@/lib/server/winner";
 
 export const dynamic = "force-dynamic";
 
@@ -31,9 +32,10 @@ export default async function RewardPage() {
   }
 
   const winnerIndex = session?.data.winnerIndex;
-  if (!session?.data.ctfCompleted || !winnerIndex || winnerIndex < 1 || winnerIndex > getWinnerLimit()) redirect("/closed");
+  if (!session || !winnerIndex || winnerIndex < 1 || winnerIndex > getWinnerLimit()) redirect("/closed");
 
-  const code = makeWinnerCode(environment.REFERRAL_SECRET, winnerIndex);
+  const code = session.data.winnerCode;
+  if (!code) redirect("/closed");
   const workshopName = process.env.WORKSHOP_NAME?.trim() || workshopPlaceholders.name;
   const workshopDate = process.env.WORKSHOP_DATE?.trim() || workshopPlaceholders.date;
   const workshopVenue = process.env.WORKSHOP_VENUE?.trim() || workshopPlaceholders.venue;
@@ -55,6 +57,7 @@ export default async function RewardPage() {
           <div><span className="micro-label">DATE</span><p>{workshopDate}</p></div>
           <div><span className="micro-label">VENUE</span><p>{workshopVenue}</p></div>
           <p>{workshopCredit.replace("FANDOM ZONE", eventName)}</p>
+          <WorkshopRegistrationLink />
         </div>
         <p className="refund-note">
           Already registered for {eventName}? Contact{" "}

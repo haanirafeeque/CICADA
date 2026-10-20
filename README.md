@@ -22,7 +22,7 @@ The site fails closed if answer values, secrets, or Redis credentials needed for
 | `CTF_RIDDLE_ANSWER` | Final riddle answer, checked server-side | Required |
 | `CTF_FLAG` | Web challenge flag, checked server-side | Required |
 | `SESSION_SECRET` | HMAC-SHA256 key for signed session cookies; use a random value at least 32 characters long | Required |
-| `REFERRAL_SECRET` | HMAC-SHA256 key for winner codes; use a separate random value at least 32 characters long | Required |
+| `REFERRAL_SECRET` | HMAC-SHA256 key for duplicate-winner fingerprints; keep it stable during the event and use a random value at least 32 characters long | Required |
 | `WINNER_LIMIT` | Maximum number of winner codes | Defaults to `15` |
 | `CONTACT_NUMBER` | Contact number for the 50% refund process | Team supplied |
 | `EVENT_NAME` | Main event display name | Defaults to `FANDOM ZONE` |
@@ -51,13 +51,9 @@ Set all stage answers, the riddle answer, and the flag through `.env.local` for 
 
 ## Winner codes and closing
 
-With `REFERRAL_SECRET` configured, print the staff verification list with:
+Each successful winner claim receives a cryptographically random coupon code. Redis stores one hash per winner as `winner:01`, `winner:02`, and so on, with `name`, `email`, `couponCode`, and `winnerIndex` fields. Inspect a record in the Upstash CLI with `HGETALL winner:01`, or list winner keys with `SCAN 0 MATCH winner:[0-9]* COUNT 100`.
 
-```powershell
-npx tsx scripts/print-codes.ts
-```
-
-The script prints codes for indices 1 through 15. The first `WINNER_LIMIT` successful flag claims receive a code. Later successful completions go to `/closed`; the winner counter is intentionally not decremented. To close the site after all codes are claimed, set `WINNER_LIMIT` to the already claimed count (or temporarily set the environment unavailable) and redeploy. Existing completed sessions retain their server-side state.
+Winner name and email comparisons ignore case; names also collapse repeated whitespace. A name or email already attached to a winner cannot claim another code. `REFERRAL_SECRET` fingerprints these identifiers for duplicate checks, so keep it unchanged while the event is running. The first `WINNER_LIMIT` unique successful flag claims receive a code. Later successful completions go to `/closed`; the winner counter is intentionally not decremented. To close the site after all codes are claimed, set `WINNER_LIMIT` to the already claimed count (or temporarily set the environment unavailable) and redeploy. Existing completed sessions retain their server-side state.
 
 ## Tests and checks
 
@@ -73,7 +69,9 @@ The end-to-end suite runs against an in-memory Redis protocol stub and uses gene
 
 ## Challenge note
 
-The `/api/ctf/notes?id=7` IDOR is intentionally vulnerable as part of the web challenge. It only returns the flag note after the current session has solved the riddle; it cannot read other sessions or environment values. Notes 1 and 2 are public. Other IDs return 404.
+The `/api/notes/03` IDOR is intentionally vulnerable as part of the web challenge. It only returns the flag note after the current session has solved the riddle; it cannot read other sessions or environment values. Notes `/api/notes/01` and `/api/notes/02` are public. Other IDs return 404.
+
+After the riddle, the Notes panel provides an optional beginner hint about inspecting the note request and points players to the CICADA Instagram Story for an extra hint.
 
 ## Assets
 
